@@ -1,7 +1,7 @@
 <html ng-app="notesApp">
 
 <head>
-    <title> List of Notes</title>
+    <title> List of Tasks</title>
     <style>
         .todo-item {
             padding: 15px;
@@ -20,7 +20,7 @@
 </head>
 
 <body ng-controller="MainController as mainCtrl">
-    <h1>Hello: Notes in your Account!</h1>
+    <h1>Hello: Tasks in your List!</h1>
     <div class="container">
         <div id="todo-list" ng-repeat="todo in mainCtrl.items" class="todo-item">
             <div class="row col-sm-12	col-md-12	col-lg-12">
