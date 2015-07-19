@@ -1,0 +1,153 @@
+<html ng-app="notesApp">
+
+<head>
+    <title> List of Notes</title>
+    <style>
+        .todo-item {
+            padding: 15px;
+        }
+        
+        .error {
+            color: red;
+        }
+        
+        #todo-list .doneCls {
+            color: #777777;
+            font-weight: bold;
+            text-decoration: line-through;
+        }
+    </style>
+</head>
+
+<body ng-controller="MainController as mainCtrl">
+    <h1>Hello: Notes in your Account!</h1>
+    <div class="container">
+        <div id="todo-list" ng-repeat="todo in mainCtrl.items" class="todo-item">
+            <div class="row col-sm-12	col-md-12	col-lg-12">
+                <input type="checkbox" ng-model="todo.done" ng-click="mainCtrl.updateItm(todo)" /> <span ng-class="{doneCls: todo.done}">  <span ng-bind="todo.label"></span> - by <span ng-bind="todo.user"></span> </span> <span ng-click="mainCtrl.delete(todo)"><i class="icon-remove-sign"></i></span>
+            </div>
+        </div>
+        <br/>
+        <div>
+            <form name="addForm" class="form-group" ng-submit="mainCtrl.add()">
+                <input type="text" placeholder="Please Enter Your Note" name="note" ng-model="mainCtrl.newTodo.label" ng-model-options="{ updateOn: 'blur' }">
+                <input type="text" placeholder="User" name="user" ng-model="mainCtrl.newTodo.user">
+                <input type="submit" class="btn btn-primary" value="Add" ng-disabled="addForm.$invalid">
+                <br/>
+            </form>
+        </div>
+    </div>
+    <script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.3.11/angular.js"></script>
+    <script>
+        angular.module('notesApp', [])
+            .controller('MainController', ['$http', 'socketio', function($http, socketio) {
+                var self = this;
+                self.items = [];
+                self.newTodo = {};
+
+                //code handles note_add event from server
+                socketio.on('note_add', function(note) {
+                    self.items.push(note);
+                });
+
+                //code handles note_remove event from server
+                socketio.on('note_remove', function(delNoteId) {
+                    self.items = self.items.filter(function(note) {
+                        return note.id != delNoteId;
+                    });
+                });
+                socketio.on('note_complete', function(cmpltdNoteId) {
+                    angular.forEach(self.items, function(item) {
+                        if (item.id == cmpltdNoteId) {
+                            item.done = !item.done;
+                        }
+                    });
+                });
+
+                var fetchTodos = function() {
+                    //fetches all the notes using GET
+                    return $http.get('/api/note').then(
+                        function(response) {
+                            self.items = response.data;
+                        },
+                        function(errResponse) {
+                            console.error('Error while fetching notes');
+                        });
+                };
+
+                fetchTodos();
+
+                //function handles making post call to server on additon of new note.
+                self.add = function() {
+                    $http.post('/api/note', self.newTodo)
+                        .then(fetchTodos)
+                        .then(function(response) {
+                            self.newTodo = {};
+                        });
+                };
+
+                self.updateItm = function(todoItm) {
+                    var params = {
+                        noteID: todoItm.id
+                    };
+                    $http.put('/api/note/' + todoItm.id, params)
+                        .success(function(data, status, headers, config) {
+                            todoItm.done = !todoItm.done;
+                        }).error(function(data, status, headers, config) {
+                            console.log("DELETE ERROR", data, status, headers, config);
+                        })
+
+                }
+                self.delete = function(todo) {
+
+                    var params = {
+                        noteID: todo.id
+                    };
+
+                    $http.delete('/api/note/' + todo.id, params)
+                        .success(function(data, status, headers, config) {
+                            // onsuccess from server then remove item from list
+                            self.items = self.items.filter(function(note) {
+                                return note.id != data;
+                            });
+                        }).error(function(data, status, headers, config) {
+                            console.log("DELETE ERROR", data, status, headers, config);
+                        })
+                };
+            }])
+            .factory('socketio', ["$rootScope", function($rootScope) {
+                //integrates angular and socketio
+                var socket = io.connect();
+                return {
+                    on: function(eventName, callback) {
+                        socket.on(eventName, function() {
+                            var args = arguments;
+                            $rootScope.$apply(function() {
+                                callback.apply(socket, args);
+                            });
+                        });
+                    },
+                    emit: function(eventName, data, callback) {
+                        socket.emit(eventName, data, function() {
+                            var args = arguments;
+                            $rootScope.$apply(function() {
+                                if (callback) {
+                                    callback.apply(socket, args);
+                                }
+                            });
+                        })
+                    }
+                };
+            }]);
+    </script>
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.5/css/bootstrap.min.css">
+    <!-- Optional theme -->
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.5/css/bootstrap-theme.min.css">
+    <!-- Latest compiled and minified JavaScript -->
+    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.5/js/bootstrap.min.js"></script>
+    <script src="https://cdn.socket.io/socket.io-1.3.5.js"></script>
+    <link href="//netdna.bootstrapcdn.com/twitter-bootstrap/2.3.2/css/bootstrap-combined.no-icons.min.css" rel="stylesheet">
+    <link href="//netdna.bootstrapcdn.com/font-awesome/3.2.1/css/font-awesome.css" rel="stylesheet">
+</body>
+
+</html>
